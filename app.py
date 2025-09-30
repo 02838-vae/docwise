@@ -8,8 +8,8 @@ import re
 # =========================
 def load_questions(file_path):
     doc = Document(file_path)
-    sections = {}
-    current_section = None
+    sections = {"Chung": []}  # mặc định có "Chung"
+    current_section = "Chung"
     current_q = None
 
     for para in doc.paragraphs:
@@ -19,21 +19,24 @@ def load_questions(file_path):
 
         # Nếu gặp tiêu đề phụ lục
         if text.lower().startswith("phụ lục"):
+            # push câu hỏi đang làm dở
+            if current_q:
+                sections[current_section].append(current_q)
+                current_q = None
             current_section = text
             if current_section not in sections:
                 sections[current_section] = []
-            current_q = None
             continue
 
         # Nếu là câu hỏi (bắt đầu bằng số)
-        if re.match(r'^\d+\.', text):
-            if current_q:  # lưu câu trước đó
+        if re.match(r'^\d+\s*\.', text):
+            if current_q:
                 sections[current_section].append(current_q)
             current_q = {"question": text, "options": []}
             continue
 
         # Nếu là đáp án (A., B., C., D., E.)
-        if current_q and re.match(r'^[A-E]\.', text):
+        if current_q and re.match(r'^[A-Ea-e]\.', text):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
                 for run in para.runs
@@ -41,7 +44,7 @@ def load_questions(file_path):
             current_q["options"].append({"text": text, "correct": is_correct})
 
     # Thêm câu hỏi cuối cùng
-    if current_q and current_section:
+    if current_q:
         sections[current_section].append(current_q)
 
     return sections
@@ -71,7 +74,7 @@ def main():
     with st.form("quiz_form"):
         answers = {}
         for i, q in enumerate(questions):
-            st.subheader(f"Câu {i+1}: {q['question']}")
+            st.subheader(q["question"])
             options = [opt["text"] for opt in q["options"]]
             answers[i] = st.radio(
                 "Chọn đáp án:",
@@ -94,20 +97,20 @@ def main():
 
             if user_ans == correct_ans:
                 score += 1
-                results.append((i + 1, True, user_ans, correct_ans))
+                results.append((q["question"], True, user_ans, correct_ans))
             else:
-                results.append((i + 1, False, user_ans, correct_ans))
+                results.append((q["question"], False, user_ans, correct_ans))
 
         # Tổng điểm
         st.success(f"🎯 Kết quả: {score}/{len(questions)} câu đúng")
 
         # Chi tiết
         st.subheader("📋 Chi tiết kết quả:")
-        for q_num, is_correct, user_ans, correct_ans in results:
+        for q_text, is_correct, user_ans, correct_ans in results:
             if is_correct:
-                st.write(f"✅ Câu {q_num}: Đúng ({user_ans})")
+                st.write(f"✅ {q_text} → Đúng ({user_ans})")
             else:
-                st.write(f"❌ Câu {q_num}: Sai. Bạn chọn: {user_ans}. Đáp án đúng: {correct_ans}")
+                st.write(f"❌ {q_text} → Sai. Bạn chọn: {user_ans}. Đáp án đúng: {correct_ans}")
 
 
 if __name__ == "__main__":
