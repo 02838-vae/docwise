@@ -3,9 +3,10 @@ from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 import re
 
-# =========================
-# Hàm đọc dữ liệu từ file Word, chia theo phụ lục
-# =========================
+def is_all_caps(text):
+    """Kiểm tra xem text có phải toàn chữ hoa (và khoảng trắng) không"""
+    return text.replace(" ", "").isupper()
+
 def load_questions(file_path):
     doc = Document(file_path)
     sections = {"Chung": []}
@@ -17,7 +18,7 @@ def load_questions(file_path):
         if not text:
             continue
 
-        # Nhận diện tiêu đề phụ lục
+        # Nếu là tiêu đề phụ lục
         if text.lower().startswith("phụ lục"):
             if current_q:
                 sections[current_section].append(current_q)
@@ -27,26 +28,36 @@ def load_questions(file_path):
                 sections[current_section] = []
             continue
 
-        # Nhận diện câu hỏi (bắt đầu bằng số.)
-        if re.match(r'^\d+\.', text):
+        # Nếu là câu hỏi
+        if re.match(r'^\d+\.', text) or "choose the correct group of words" in text.lower():
             if current_q:
                 sections[current_section].append(current_q)
             current_q = {"question": text, "options": []}
             continue
 
-        # Nhận diện đáp án (A., B., C., D., E.)
+        # Nếu là đáp án dạng A. B. C. D.
         if current_q and re.match(r'^[A-E]\.', text):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
                 for run in para.runs
             )
             current_q["options"].append({"text": text, "correct": is_correct})
+            continue
 
-    # Push câu hỏi cuối cùng
+        # Nếu là đáp án viết hoa (GEAR MAIN DOORS …)
+        if current_q and is_all_caps(text):
+            is_correct = any(
+                run.font.highlight_color == WD_COLOR_INDEX.YELLOW
+                for run in para.runs
+            )
+            current_q["options"].append({"text": text, "correct": is_correct})
+            continue
+
     if current_q:
         sections[current_section].append(current_q)
 
     return sections
+
 
 
 # =========================
@@ -58,9 +69,6 @@ def main():
     sections = load_questions("docwise.docx")
     section_names = list(sections.keys())
 
-    # Debug mode toggle
-    debug = st.sidebar.checkbox("🔍 Debug mode (hiển thị parser raw)")
-
     chosen_section = st.selectbox("👉 Bạn muốn làm phần nào?", [""] + section_names)
 
     if not chosen_section:
@@ -70,19 +78,6 @@ def main():
     questions = sections[chosen_section]
     st.write(f"🔎 Đang làm: **{chosen_section}** ({len(questions)} câu hỏi)")
 
-    # Nếu bật debug mode thì chỉ hiển thị kết quả parse
-    if debug:
-        st.subheader("🛠 Kết quả parser đọc được:")
-        for i, q in enumerate(questions, start=1):
-            st.write(f"**{i}. {q['question']}**")
-            for opt in q["options"]:
-                if opt["correct"]:
-                    st.write(f"✅ {opt['text']}")
-                else:
-                    st.write(f"❌ {opt['text']}")
-        return  # Không hiện form làm bài nữa
-
-    # Bình thường thì hiển thị form làm bài
     with st.form("quiz_form"):
         answers = {}
         for i, q in enumerate(questions):
@@ -122,6 +117,3 @@ def main():
             else:
                 st.write(f"❌ {q_text} → Sai. Bạn chọn: {user_ans}. Đáp án đúng: {correct_ans}")
 
-
-if __name__ == "__main__":
-    main()
