@@ -3,47 +3,43 @@ from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 import re
 
-# =========================
-# Hàm đọc dữ liệu từ file Word, chia theo phụ lục
-# =========================
 def load_questions(file_path):
     doc = Document(file_path)
-    sections = {"Chung": []}  # mặc định có "Chung"
+    sections = {"Chung": []}
     current_section = "Chung"
     current_q = None
 
     for para in doc.paragraphs:
-        text = para.text.strip()
-        if not text:
+        raw = para.text.strip()
+        if not raw:
             continue
 
-        # Nếu gặp tiêu đề phụ lục
-        if text.lower().startswith("phụ lục"):
-            # push câu hỏi đang làm dở
+        # Nhận diện tiêu đề phụ lục
+        if raw.lower().startswith("phụ lục"):
             if current_q:
                 sections[current_section].append(current_q)
                 current_q = None
-            current_section = text
+            current_section = raw
             if current_section not in sections:
                 sections[current_section] = []
             continue
 
-        # Nếu là câu hỏi (bắt đầu bằng số)
-        if re.match(r'^\d+\s*\.', text):
+        # Nhận diện câu hỏi (bắt đầu bằng số.)
+        if re.match(r'^\d+\s*\.', raw):
             if current_q:
                 sections[current_section].append(current_q)
-            current_q = {"question": text, "options": []}
+            current_q = {"question": raw, "options": []}
             continue
 
-        # Nếu là đáp án (A., B., C., D., E.)
-        if current_q and re.match(r'^[A-Ea-e]\.', text):
+        # Nhận diện đáp án (A., B., C., D., E.)
+        if current_q and re.match(r'^[A-Ea-e]\.', raw):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
                 for run in para.runs
             )
-            current_q["options"].append({"text": text, "correct": is_correct})
+            current_q["options"].append({"text": raw, "correct": is_correct})
 
-    # Thêm câu hỏi cuối cùng
+    # Push câu hỏi cuối cùng
     if current_q:
         sections[current_section].append(current_q)
 
@@ -56,11 +52,9 @@ def load_questions(file_path):
 def main():
     st.title("📘 Bài kiểm tra trắc nghiệm tiếng Anh kỹ thuật")
 
-    # Load ngân hàng câu hỏi
     sections = load_questions("docwise.docx")
     section_names = list(sections.keys())
 
-    # Bắt buộc chọn phụ lục trước
     chosen_section = st.selectbox("👉 Bạn muốn làm phần nào?", [""] + section_names)
 
     if not chosen_section:
@@ -70,7 +64,6 @@ def main():
     questions = sections[chosen_section]
     st.write(f"🔎 Đang làm: **{chosen_section}** ({len(questions)} câu hỏi)")
 
-    # Gom câu hỏi trong form để tránh reload từng click
     with st.form("quiz_form"):
         answers = {}
         for i, q in enumerate(questions):
@@ -101,17 +94,11 @@ def main():
             else:
                 results.append((q["question"], False, user_ans, correct_ans))
 
-        # Tổng điểm
         st.success(f"🎯 Kết quả: {score}/{len(questions)} câu đúng")
 
-        # Chi tiết
         st.subheader("📋 Chi tiết kết quả:")
         for q_text, is_correct, user_ans, correct_ans in results:
             if is_correct:
                 st.write(f"✅ {q_text} → Đúng ({user_ans})")
             else:
                 st.write(f"❌ {q_text} → Sai. Bạn chọn: {user_ans}. Đáp án đúng: {correct_ans}")
-
-
-if __name__ == "__main__":
-    main()
