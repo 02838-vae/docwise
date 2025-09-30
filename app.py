@@ -3,19 +3,22 @@ from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 import re
 
-def is_all_caps(text):
-    """Kiểm tra text có phải toàn chữ hoa (và khoảng trắng/số)"""
-    cleaned = text.replace(" ", "").replace(".", "")
-    return cleaned.isupper() and len(cleaned) > 2
-
 def is_question(text):
     """Nhận diện câu hỏi"""
-    if text.endswith("?"):
+    if re.match(r'^\d+\.\s*\w+', text):  # số. + chữ
+        return True
+    if text.strip().endswith("?"):
         return True
     if "choose the correct group of words" in text.lower():
         return True
-    # Câu bắt đầu bằng số và có chữ
-    if re.match(r'^\d+\.', text) and not re.search(r'\d+\s*(m|kg|ft|nm)', text.lower()):
+    return False
+
+def is_option(text):
+    """Nhận diện đáp án"""
+    if re.match(r'^[A-E]\.', text):
+        return True
+    # nếu ngắn và nhiều chữ hoa (ví dụ GEAR MAIN DOORS)
+    if len(text.split()) <= 6 and text.replace(" ", "").isupper():
         return True
     return False
 
@@ -47,30 +50,24 @@ def load_questions(file_path):
             current_q = {"question": text, "options": []}
             continue
 
-        # Nếu là đáp án rõ ràng (A., B., C., D., E.)
-        if current_q and re.match(r'^[A-E]\.', text):
+        # Nếu là đáp án
+        if current_q and is_option(text):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
                 for run in para.runs
             )
             current_q["options"].append({"text": text, "correct": is_correct})
-            continue
 
-        # Nếu là đáp án kiểu in hoa hoặc mô tả sau câu hỏi
-        if current_q and (is_all_caps(text) or not is_question(text)):
-            is_correct = any(
-                run.font.highlight_color == WD_COLOR_INDEX.YELLOW
-                for run in para.runs
-            )
-            current_q["options"].append({"text": text, "correct": is_correct})
-            continue
-
+    # Push câu hỏi cuối cùng
     if current_q and current_section:
         sections[current_section].append(current_q)
 
     return sections
 
 
+# =========================
+# App Streamlit
+# =========================
 def main():
     st.title("📘 Bài kiểm tra trắc nghiệm tiếng Anh kỹ thuật")
 
@@ -90,7 +87,6 @@ def main():
 
     st.write(f"🔎 Đang làm: **{chosen_section}** ({len(questions)} câu hỏi)")
 
-    # Form quiz
     with st.form("quiz_form"):
         answers = {}
         for i, q in enumerate(questions, start=1):  # đánh số lại từ 1
