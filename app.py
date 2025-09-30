@@ -17,17 +17,21 @@ def load_questions(file_path):
         # Nếu là tiêu đề phụ lục
         if text.lower().startswith("phụ lục"):
             if current_q and current_section:
-                sections[current_section].append(current_q)
+                if current_q["options"]:
+                    sections[current_section].append(current_q)
                 current_q = None
             current_section = text
             if current_section not in sections:
                 sections[current_section] = []
             continue
 
-        # Nếu là câu hỏi (bắt đầu bằng số.)
+        # Nếu là câu hỏi (số. ...)
         if re.match(r'^\d+\.', text):
+            # Lưu câu hỏi trước nếu có
             if current_q and current_section:
-                sections[current_section].append(current_q)
+                if current_q["options"]:
+                    sections[current_section].append(current_q)
+            # Tạo câu hỏi mới
             current_q = {"question": text, "options": []}
             continue
 
@@ -38,10 +42,12 @@ def load_questions(file_path):
                 for run in para.runs
             )
             current_q["options"].append({"text": text, "correct": is_correct})
+            continue
 
     # Push câu hỏi cuối cùng
     if current_q and current_section:
-        sections[current_section].append(current_q)
+        if current_q["options"]:
+            sections[current_section].append(current_q)
 
     return sections
 
