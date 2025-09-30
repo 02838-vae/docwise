@@ -3,25 +3,6 @@ from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 import re
 
-def is_question(text):
-    """Nhận diện câu hỏi"""
-    if re.match(r'^\d+\.\s*\w+', text):  # số. + chữ
-        return True
-    if text.strip().endswith("?"):
-        return True
-    if "choose the correct group of words" in text.lower():
-        return True
-    return False
-
-def is_option(text):
-    """Nhận diện đáp án"""
-    if re.match(r'^[A-E]\.', text):
-        return True
-    # nếu ngắn và nhiều chữ hoa (ví dụ GEAR MAIN DOORS)
-    if len(text.split()) <= 6 and text.replace(" ", "").isupper():
-        return True
-    return False
-
 def load_questions(file_path):
     doc = Document(file_path)
     sections = {}
@@ -43,15 +24,15 @@ def load_questions(file_path):
                 sections[current_section] = []
             continue
 
-        # Nếu là câu hỏi
-        if is_question(text):
+        # Nếu là câu hỏi (bắt đầu bằng số.)
+        if re.match(r'^\d+\.', text):
             if current_q and current_section:
                 sections[current_section].append(current_q)
             current_q = {"question": text, "options": []}
             continue
 
-        # Nếu là đáp án
-        if current_q and is_option(text):
+        # Nếu là đáp án (A., B., C., D., E.)
+        if current_q and re.match(r'^[A-E]\.', text):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
                 for run in para.runs
