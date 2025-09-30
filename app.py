@@ -1,42 +1,40 @@
-Python 3.13.7 (tags/v3.13.7:bcee1c3, Aug 14 2025, 14:15:11) [MSC v.1944 64 bit (AMD64)] on win32
-Enter "help" below or click "Help" above for more information.
->>> import streamlit as st
-... from docx import Document
-... from docx.enum.text import WD_COLOR_INDEX
-... 
-... # =========================
-... # Hàm đọc dữ liệu từ file Word
-... # =========================
-... def load_questions(file_path):
-...     doc = Document(file_path)
-...     questions = []
-...     current_q = None
-... 
-...     for para in doc.paragraphs:
-...         text = para.text.strip()
-...         if not text:
-...             continue
-... 
-...         # Nếu là câu hỏi
-...         if text.lower().startswith("choose") or text.endswith("?"):
-...             if current_q:
-...                 questions.append(current_q)
-...             current_q = {"question": text, "options": []}
-... 
-...         # Nếu là đáp án
-...         elif current_q:
-...             # Kiểm tra highlight vàng
-...             is_correct = any(
-...                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
-...                 for run in para.runs
-...             )
-...             current_q["options"].append({"text": text, "correct": is_correct})
-... 
-...     if current_q:
-...         questions.append(current_q)
-... 
-...     return questions
-... 
+import streamlit as st
+from docx import Document
+from docx.enum.text import WD_COLOR_INDEX
+
+# =========================
+# Hàm đọc dữ liệu từ file Word
+# =========================
+def load_questions(file_path):
+    doc = Document(file_path)
+    questions = []
+    current_q = None
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            continue
+
+        # Nếu là câu hỏi
+        if text.lower().startswith("choose") or text.endswith("?"):
+            if current_q:
+                questions.append(current_q)
+            current_q = {"question": text, "options": []}
+
+        # Nếu là đáp án
+        elif current_q:
+            # Kiểm tra highlight vàng
+            is_correct = any(
+                run.font.highlight_color == WD_COLOR_INDEX.YELLOW
+                for run in para.runs
+            )
+            current_q["options"].append({"text": text, "correct": is_correct})
+
+    if current_q:
+        questions.append(current_q)
+
+    return questions
+
 
 # =========================
 # App Streamlit
