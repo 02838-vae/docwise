@@ -1,6 +1,7 @@
 import streamlit as st
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
+import re
 
 # =========================
 # Hàm đọc dữ liệu từ file Word, chia theo phụ lục
@@ -24,15 +25,15 @@ def load_questions(file_path):
             current_q = None
             continue
 
-        # Nếu là câu hỏi
-        if text.lower().startswith("choose") or text.endswith("?"):
-            if current_q:
+        # Nếu là câu hỏi (chứa "choose" hoặc kết thúc bằng "?")
+        if re.match(r'(?i)(choose|what|which|who|where|when|why|how)', text) or text.endswith("?"):
+            if current_q:  # lưu câu hỏi trước đó
                 sections[current_section].append(current_q)
             current_q = {"question": text, "options": []}
             continue
 
-        # Nếu là đáp án (chỉ khi đang có câu hỏi)
-        if current_q:
+        # Nếu là đáp án: bắt đầu bằng A. B. C. D. E.
+        if current_q and re.match(r'^[A-E]\.', text):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
                 for run in para.runs
@@ -86,6 +87,8 @@ def main():
         results = []
 
         for i, q in enumerate(questions):
+            if not q["options"]:
+                continue
             correct_ans = next(opt["text"] for opt in q["options"] if opt["correct"])
             user_ans = answers[i]
 
