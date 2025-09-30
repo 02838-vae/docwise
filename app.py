@@ -8,7 +8,12 @@ def is_all_caps(text):
     return text.replace(" ", "").isupper()
 
 def load_questions(file_path):
-    doc = Document(file_path)
+    try:
+        doc = Document(file_path)
+    except Exception as e:
+        st.error(f"Không thể mở file Word: {e}")
+        return {}
+
     sections = {"Chung": []}
     current_section = "Chung"
     current_q = None
@@ -18,7 +23,7 @@ def load_questions(file_path):
         if not text:
             continue
 
-        # Nếu là tiêu đề phụ lục
+        # Nhận diện tiêu đề phụ lục
         if text.lower().startswith("phụ lục"):
             if current_q:
                 sections[current_section].append(current_q)
@@ -28,14 +33,14 @@ def load_questions(file_path):
                 sections[current_section] = []
             continue
 
-        # Nếu là câu hỏi
+        # Nhận diện câu hỏi (số thứ tự hoặc chứa "choose the correct group of words")
         if re.match(r'^\d+\.', text) or "choose the correct group of words" in text.lower():
             if current_q:
                 sections[current_section].append(current_q)
             current_q = {"question": text, "options": []}
             continue
 
-        # Nếu là đáp án dạng A. B. C. D.
+        # Nhận diện đáp án (A., B., C., D., E.)
         if current_q and re.match(r'^[A-E]\.', text):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
@@ -44,7 +49,7 @@ def load_questions(file_path):
             current_q["options"].append({"text": text, "correct": is_correct})
             continue
 
-        # Nếu là đáp án viết hoa (GEAR MAIN DOORS …)
+        # Nhận diện đáp án dạng chữ in hoa
         if current_q and is_all_caps(text):
             is_correct = any(
                 run.font.highlight_color == WD_COLOR_INDEX.YELLOW
@@ -59,16 +64,15 @@ def load_questions(file_path):
     return sections
 
 
-
-# =========================
-# App Streamlit
-# =========================
 def main():
     st.title("📘 Bài kiểm tra trắc nghiệm tiếng Anh kỹ thuật")
 
     sections = load_questions("docwise.docx")
-    section_names = list(sections.keys())
+    if not sections:
+        st.warning("❌ Không tìm thấy câu hỏi nào. Kiểm tra lại file docwise.docx")
+        return
 
+    section_names = list(sections.keys())
     chosen_section = st.selectbox("👉 Bạn muốn làm phần nào?", [""] + section_names)
 
     if not chosen_section:
@@ -76,6 +80,10 @@ def main():
         return
 
     questions = sections[chosen_section]
+    if not questions:
+        st.warning(f"❌ Không có câu hỏi nào trong {chosen_section}")
+        return
+
     st.write(f"🔎 Đang làm: **{chosen_section}** ({len(questions)} câu hỏi)")
 
     with st.form("quiz_form"):
@@ -83,6 +91,9 @@ def main():
         for i, q in enumerate(questions):
             st.subheader(q["question"])
             options = [opt["text"] for opt in q["options"]]
+            if not options:
+                st.warning(f"Câu {i+1} chưa có đáp án, bỏ qua.")
+                continue
             answers[i] = st.radio(
                 "Chọn đáp án:",
                 options,
@@ -97,9 +108,13 @@ def main():
         results = []
 
         for i, q in enumerate(questions):
-            if not q["options"]:
+            if not q["options"] or i not in answers:
                 continue
-            correct_ans = next(opt["text"] for opt in q["options"] if opt["correct"])
+            # Tìm đáp án đúng, nếu không có thì skip
+            correct_options = [opt["text"] for opt in q["options"] if opt["correct"]]
+            if not correct_options:
+                continue
+            correct_ans = correct_options[0]
             user_ans = answers[i]
 
             if user_ans == correct_ans:
@@ -117,3 +132,6 @@ def main():
             else:
                 st.write(f"❌ {q_text} → Sai. Bạn chọn: {user_ans}. Đáp án đúng: {correct_ans}")
 
+
+if __name__ == "__main__":
+    main()
