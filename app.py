@@ -58,6 +58,9 @@ def main():
     sections = load_questions("docwise.docx")
     section_names = list(sections.keys())
 
+    # Debug mode toggle
+    debug = st.sidebar.checkbox("🔍 Debug mode (hiển thị parser raw)")
+
     chosen_section = st.selectbox("👉 Bạn muốn làm phần nào?", [""] + section_names)
 
     if not chosen_section:
@@ -67,6 +70,19 @@ def main():
     questions = sections[chosen_section]
     st.write(f"🔎 Đang làm: **{chosen_section}** ({len(questions)} câu hỏi)")
 
+    # Nếu bật debug mode thì chỉ hiển thị kết quả parse
+    if debug:
+        st.subheader("🛠 Kết quả parser đọc được:")
+        for i, q in enumerate(questions, start=1):
+            st.write(f"**{i}. {q['question']}**")
+            for opt in q["options"]:
+                if opt["correct"]:
+                    st.write(f"✅ {opt['text']}")
+                else:
+                    st.write(f"❌ {opt['text']}")
+        return  # Không hiện form làm bài nữa
+
+    # Bình thường thì hiển thị form làm bài
     with st.form("quiz_form"):
         answers = {}
         for i, q in enumerate(questions):
